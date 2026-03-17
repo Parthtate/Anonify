@@ -23,8 +23,9 @@ async function dbConnect(): Promise<void> {
   } catch (error) {
     console.error('Database connection failed:', error);
 
-    // Graceful exit in case of a connection error
-    process.exit(1);
+    // Throw the error so individual API routes fail gracefully
+    // without crashing the entire Next.js server
+    throw new Error(`Database connection failed: ${error}`);
   }
 }
 

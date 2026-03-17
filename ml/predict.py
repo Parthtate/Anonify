@@ -1,9 +1,11 @@
 import sys
 import joblib
+import os
 
-# Load the model and vectorizer
-model = joblib.load('D:\\Anonify\\ml\\offensive_language_model.pkl')
-vectorizer = joblib.load('D:\\Anonify\\ml\\vectorizer.pkl')
+# Resolve paths relative to this script's location — works on any machine
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+model = joblib.load(os.path.join(BASE_DIR, 'offensive_language_model.pkl'))
+vectorizer = joblib.load(os.path.join(BASE_DIR, 'vectorizer.pkl'))
 
 # Get the input message
 message = sys.argv[1]
