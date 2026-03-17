@@ -22,6 +22,12 @@ The platform utilizes a supervised machine learning approach to identify and blo
 
 ---
 
+## 📽️ Demo
+
+https://github.com/user-attachments/assets/f4e9b7c4-548e-46cd-bec1-ebc3a68d2370
+
+---
+
 ## 🧠 Technologies & Methodologies
 
 - **Python** for backend content moderation logic
