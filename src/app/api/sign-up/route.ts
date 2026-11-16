@@ -2,12 +2,41 @@ import dbConnect from '@/lib/dbConnect';
 import UserModel from '@/model/User';
 import bcrypt from 'bcryptjs';
 import { sendVerificationEmail } from '@/helpers/sendVerificationEmail';
+import { clientIp, rateLimit, tooManyRequests } from '@/lib/rateLimit';
+
+// This endpoint sends mail to any address given to it, so it is capped per address
+// as well as per IP: otherwise it can be used to spam a stranger and burn the
+// provider's daily quota, blocking real sign-ups.
+const PER_IP = { limit: 5, windowMs: 60 * 60 * 1000 };
+const PER_EMAIL = { limit: 3, windowMs: 60 * 60 * 1000 };
 
 export async function POST(request: Request) {
   await dbConnect();
 
   try {
     const { username, email, password } = await request.json();
+
+    const byIp = await rateLimit(`signup:ip:${clientIp(request)}`, PER_IP.limit, PER_IP.windowMs);
+    if (!byIp.ok) {
+      return tooManyRequests(
+        'Too many sign-up attempts. Please try again later.',
+        byIp.retryAfterSeconds
+      );
+    }
+
+    if (typeof email === 'string' && email) {
+      const byEmail = await rateLimit(
+        `signup:email:${email.toLowerCase()}`,
+        PER_EMAIL.limit,
+        PER_EMAIL.windowMs
+      );
+      if (!byEmail.ok) {
+        return tooManyRequests(
+          'We have already sent several codes to that address. Check your inbox, including spam.',
+          byEmail.retryAfterSeconds
+        );
+      }
+    }
 
     const existingVerifiedUserByUsername = await UserModel.findOne({
       username,

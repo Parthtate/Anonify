@@ -1,5 +1,5 @@
-import { resend } from "@/lib/resend";
-import VerificationEmail from "../../emails/VerificationEmail";
+import { render } from '@react-email/render';
+import VerificationEmail from '../../emails/VerificationEmail';
 import { ApiResponse } from '@/types/ApiResponse';
 
 export async function sendVerificationEmail(
@@ -7,28 +7,37 @@ export async function sendVerificationEmail(
   username: string,
   verifyCode: string
 ): Promise<ApiResponse> {
+  // Email clients run no JavaScript, so a one-tap link is the only real alternative
+  // to typing the code by hand. Needs an absolute URL.
+  const baseUrl = process.env.NEXTAUTH_URL?.replace(/\/$/, '');
+  const verifyUrl = baseUrl
+    ? `${baseUrl}/verify/${encodeURIComponent(username)}?code=${encodeURIComponent(verifyCode)}`
+    : undefined;
+
   try {
-    const { data, error } = await resend.emails.send({
-      from: 'Anonify <onboarding@resend.dev>',
-      to: email,
-      subject: 'Anonify — Your Verification Code',
-      react: VerificationEmail({ username, otp: verifyCode }),
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': process.env.BREVO_API_KEY ?? '',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: 'Anonify', email: process.env.BREVO_SENDER_EMAIL },
+        to: [{ email }],
+        subject: 'Anonify — Your Verification Code',
+        htmlContent: render(VerificationEmail({ username, otp: verifyCode, verifyUrl })),
+      }),
     });
 
-    if (error) {
-      console.error('Resend API error:', error);
-      return { success: false, message: `Email error: ${error.message}` };
+    if (!response.ok) {
+      // Provider details stay in the server log; the caller is an unauthenticated sign-up.
+      console.error('Brevo API error:', response.status, await response.text());
+      return { success: false, message: 'Could not send verification email.' };
     }
 
-    console.log('Verification email sent, id:', data?.id);
     return { success: true, message: 'Verification email sent successfully.' };
-  } catch (emailError: any) {
-    console.error('Error sending verification email:', emailError);
-    return {
-      success: false,
-      message: `Failed to send verification email: ${emailError?.message ?? JSON.stringify(emailError)}`,
-    };
+  } catch (error) {
+    console.error('Error sending verification email:', error);
+    return { success: false, message: 'Could not send verification email.' };
   }
 }
-
-

@@ -1,13 +1,22 @@
+import os
+
+import joblib
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
-import joblib
+from sklearn.model_selection import train_test_split
 
-# Step 1: Load the dataset
-# Download the dataset from https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/data
-data = pd.read_csv(r'D:\\Anonify\\ml\\train.csv')  # Replace with the downloaded dataset file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Step 1: Load the dataset. train.csv is not committed (65 MB) — download it from
+# https://www.kaggle.com/c/jigsaw-toxic-comment-classification-challenge/data
+# and place it next to this script. Paths resolve relative to the file, so this
+# runs on any machine.
+TRAIN_CSV = os.path.join(BASE_DIR, 'train.csv')
+if not os.path.exists(TRAIN_CSV):
+    raise SystemExit(f'Missing {TRAIN_CSV}. See ml/README.md for the download link.')
+data = pd.read_csv(TRAIN_CSV)
 
 # Step 2: Preprocess the data
 # The dataset has a column 'comment_text' for text and multiple labels (toxic, severe_toxic, etc.)
@@ -34,7 +43,7 @@ y_pred = model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 print(f'Model Accuracy: {accuracy * 100:.2f}%')
 
-# Step 7: Save the model and vectorizer
-joblib.dump(model, 'offensive_language_model.pkl')
-joblib.dump(vectorizer, 'vectorizer.pkl')
-print("Model and vectorizer saved!")
+# Step 7: Save the model and vectorizer next to this script, not the shell's cwd.
+joblib.dump(model, os.path.join(BASE_DIR, 'offensive_language_model.pkl'))
+joblib.dump(vectorizer, os.path.join(BASE_DIR, 'vectorizer.pkl'))
+print('Model and vectorizer saved! Now run: python ml/export_model.py')

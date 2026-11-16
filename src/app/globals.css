@@ -1,7 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&display=swap');
 
 @layer base {
   :root {
@@ -72,24 +72,17 @@
     @apply border-border;
   }
 
+  /* In-page anchors glide instead of jumping — unless the reader asked for less motion. */
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
   body {
     @apply bg-[var(--background)] text-[var(--foreground)];
   }
 }
 
-@layer base {
-  nav {
-    background: linear-gradient(90deg, #51602E, #657B3D);
-    /* Aesthetic gradient */
-    color: white;
-    /* Ensure text is readable */
-  }
-
-  .navbar-title {
-    font-family: 'Playfair Display', serif;
-    /* Aesthetic font for the title */
-    font-size: 1.5rem;
-    /* Adjust size for better visibility */
-    font-weight: bold;
-  }
-}
+/* No bare element selectors here: a global `nav { background: … }` rule previously
+   leaked onto every <nav> in the app. Header styling lives in SiteHeader. */

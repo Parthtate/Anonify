@@ -7,6 +7,9 @@ const UsernameQuerySchema = z.object({
   username: usernameValidation,
 });
 
+// Never prerendered: this handler needs a live database and the request's query string.
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   await dbConnect();
 

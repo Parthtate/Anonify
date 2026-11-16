@@ -35,3 +35,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env
+
+# Training data: 65 MB, downloaded rather than committed (see ml/README.md)
+ml/train.csv
+
+# Editor settings are machine-specific
+.vscode/

@@ -51,6 +51,16 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Anonify palette, lifted from the hex values already used across pages.
+        olive: "#51602E",
+        moss: "#657B3D",
+        sage: "#B3C186",
+        leaf: "#D5DCBC",
+        paper: "#EEF1E4",
+        clay: { DEFAULT: "#BC6C25", dark: "#9E5A20" },
+      },
+      fontFamily: {
+        display: ["'Playfair Display'", "Georgia", "serif"],
       },
       borderRadius: {
         lg: "var(--radius)",

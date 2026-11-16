@@ -1,12 +1,43 @@
 import UserModel from '@/model/User';
 import dbConnect from '@/lib/dbConnect';
 import { Message } from '@/model/User';
-import { spawn } from 'child_process';
-import path from 'path';
+import { isOffensive } from '@/lib/moderate.ts';
+import { clientIp, rateLimit, tooManyRequests } from '@/lib/rateLimit';
+import { messageSchema } from '@/schemas/messageSchema';
+
+// Generous per-IP cap: a whole college or office can share one public IP, so the
+// per-recipient cap below is what actually protects an inbox from flooding.
+const PER_IP = { limit: 30, windowMs: 5 * 60 * 1000 };
+const PER_RECIPIENT = { limit: 40, windowMs: 60 * 60 * 1000 };
 
 export async function POST(request: Request) {
   await dbConnect();
   const { username, content } = await request.json();
+
+  // Public, unauthenticated endpoint — validate before touching the database.
+  // A non-string username would reach findOne as a query operator.
+  if (typeof username !== 'string') {
+    return Response.json(
+      { message: 'Invalid username', success: false },
+      { status: 400 }
+    );
+  }
+
+  const parsed = messageSchema.safeParse({ content });
+  if (!parsed.success) {
+    return Response.json(
+      { message: parsed.error.issues[0].message, success: false },
+      { status: 400 }
+    );
+  }
+
+  const byIp = await rateLimit(`send:ip:${clientIp(request)}`, PER_IP.limit, PER_IP.windowMs);
+  if (!byIp.ok) {
+    return tooManyRequests(
+      'You are sending notes very quickly. Please wait a few minutes and try again.',
+      byIp.retryAfterSeconds
+    );
+  }
 
   try {
     const user = await UserModel.findOne({ username }).exec();
@@ -25,27 +56,19 @@ export async function POST(request: Request) {
       );
     }
 
-    // Step 1: Use the trained model to classify the message
-    const pythonScript = path.join(process.cwd(), 'ml', 'predict.py');
-    const pythonProcess = spawn('python', [pythonScript, content]);
+    const byRecipient = await rateLimit(
+      `send:to:${user.username}`,
+      PER_RECIPIENT.limit,
+      PER_RECIPIENT.windowMs
+    );
+    if (!byRecipient.ok) {
+      return tooManyRequests(
+        `@${user.username} has received a lot of notes in the last hour. Try again later.`,
+        byRecipient.retryAfterSeconds
+      );
+    }
 
-    const result = await new Promise((resolve, reject) => {
-      let output = '';
-      pythonProcess.stdout.on('data', (data) => {
-        output += data.toString();
-      });
-      pythonProcess.stderr.on('data', (data) => {
-        console.error('Python error:', data.toString());
-        reject(data.toString());
-      });
-      pythonProcess.on('close', () => {
-        resolve(output.trim());
-      });
-    });
-
-    console.log('Python script output:', result);
-
-    if (result === '1') {
+    if (isOffensive(parsed.data.content)) {
       return Response.json(
         {
           message: 'Your message contains inappropriate content and cannot be sent.',
@@ -55,10 +78,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Step 2: Save the message if it passes the filter
-    const newMessage = { content, createdAt: new Date() };
-
-    // Push the new message to the user's messages array
+    const newMessage = { content: parsed.data.content, createdAt: new Date() };
     user.messages.push(newMessage as Message);
     await user.save();
 

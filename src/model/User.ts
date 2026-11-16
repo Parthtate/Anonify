@@ -26,6 +26,9 @@ export interface User extends Document {
   isVerified: boolean;
   isAcceptingMessages: boolean;
   messages: Message[];
+  /** SHA-256 of the password-reset token — the raw token only ever exists in the email. */
+  resetTokenHash?: string;
+  resetTokenExpiry?: Date;
 }
 
 // Updated User schema
@@ -63,6 +66,13 @@ const UserSchema: Schema<User> = new mongoose.Schema({
     default: true,
   },
   messages: [MessageSchema],
+  resetTokenHash: {
+    type: String,
+    index: true,
+  },
+  resetTokenExpiry: {
+    type: Date,
+  },
 });
 
 const UserModel =

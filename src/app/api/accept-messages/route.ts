@@ -4,6 +4,9 @@ import dbConnect from '@/lib/dbConnect';
 import UserModel from '@/model/User';
 import { User } from 'next-auth';
 
+// Never prerendered: both handlers need a live database and the caller's session.
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   // Connect to the database
   await dbConnect();
@@ -58,7 +61,7 @@ export async function POST(request: Request) {
 }
 
 
-export async function GET(request: Request) {
+export async function GET() {
   // Connect to the database
   await dbConnect();
 

@@ -1,188 +1,88 @@
-'use client';
-
-import React, { useState } from 'react';
-import axios, { AxiosError } from 'axios';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { CardHeader, CardContent, Card } from '@/components/ui/card';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@/components/ui/form';
-import { Textarea } from '@/components/ui/textarea';
-import { toast } from '@/components/ui/use-toast';
-import * as z from 'zod';
-import { ApiResponse } from '@/types/ApiResponse';
+import { Metadata } from 'next';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
-import { messageSchema } from '@/schemas/messageSchema';
+import { Link2Off, PauseCircle } from 'lucide-react';
+import { ComposeNote } from '@/components/compose-note';
+import { SiteHeader, headerOutlineClass } from '@/components/site-header';
+import { Button } from '@/components/ui/button';
+import dbConnect from '@/lib/dbConnect';
+import UserModel from '@/model/User';
 
-export default function SendMessage() {
-  const params = useParams<{ username: string }>();
-  const username = params.username;
+// Reads the recipient on every request so a dead or paused link says so up front,
+// instead of letting someone write a note and fail on send.
+export const dynamic = 'force-dynamic';
 
-  const form = useForm<z.infer<typeof messageSchema>>({
-    resolver: zodResolver(messageSchema),
-  });
+type Params = { params: { username: string } };
 
-  const messageContent = form.watch('content');
+async function findRecipient(raw: string) {
+  const username = decodeURIComponent(raw);
+  await dbConnect();
+  return UserModel.findOne({ username, isVerified: true }, 'username isAcceptingMessages').lean();
+}
 
-  const handleMessageClick = (message: string) => {
-    form.setValue('content', message);
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const username = decodeURIComponent(params.username);
+  const title = `Write to @${username}`;
+  const description = `Send @${username} an anonymous note on Anonify. No sign-in needed, and abuse is filtered before delivery.`;
+  return {
+    title,
+    description,
+    openGraph: { title: `${title} · Anonify`, description, type: 'website' },
   };
+}
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [isSuggestLoading, setIsSuggestLoading] = useState(false);
-
-  const onSubmit = async (data: z.infer<typeof messageSchema>) => {
-    setIsLoading(true);
-    try {
-      const response = await axios.post<ApiResponse>('/api/send-message', {
-        ...data,
-        username,
-      });
-
-      toast({
-        title: 'Success',
-        description: response.data.message,
-        variant: 'default',
-      });
-      form.reset({ ...form.getValues(), content: '' });
-    } catch (error) {
-      const axiosError = error as AxiosError<ApiResponse>;
-
-      // Handle offensive message error
-      if (axiosError.response?.status === 400) {
-        toast({
-          title: 'Blocked',
-          description: axiosError.response.data.message, // Use the backend error message
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'Error',
-          description:
-            axiosError.response?.data.message ??
-            'Failed to send the message.',
-          variant: 'destructive',
-        });
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchSuggestedMessages = async () => {
-    setIsSuggestLoading(true);
-    try {
-      const response = await axios.post('/api/suggest-messages');
-      console.log('API Response:', response.data); // Debug the response
-      setSuggestions(response.data.suggestions || []); // Use the suggestions array directly
-    } catch (error) {
-      console.error('Error fetching suggestions:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch suggested messages.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSuggestLoading(false);
-    }
-  };
+export default async function SendMessagePage({ params }: Params) {
+  const recipient = await findRecipient(params.username);
+  const username = decodeURIComponent(params.username);
 
   return (
-    <div className="container mx-auto my-8 p-6 bg-white rounded max-w-4xl">
-      <h1 className="text-4xl font-bold mb-6 text-center text-[#51602E]">
-        Public Profile Link
-      </h1>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <FormField
-            control={form.control}
-            name="content"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Send Anonymous Message to @{username}</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Write your anonymous message here"
-                    className="resize-none bg-[#EEF1E4] border border-[#d1e7dd] focus:ring-[#a3d9a5]"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <div className="flex justify-center">
-            {isLoading ? (
-              <Button disabled>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Please wait
-              </Button>
-            ) : (
-              <Button
-                type="submit"
-                disabled={isLoading || !messageContent}
-                className="bg-[#BC6C25] hover:bg-[#9E5A20] text-white"
-              >
-                Send It
-              </Button>
-            )}
-          </div>
-        </form>
-      </Form>
+    <main className="min-h-screen bg-stone-50">
+      <SiteHeader>
+        <Button
+          asChild
+          variant="outline"
+          size="sm"
+          className={headerOutlineClass}
+        >
+          <Link href="/sign-up">Get your own inbox</Link>
+        </Button>
+      </SiteHeader>
 
-      <div className="space-y-4 my-8">
-        <div className="space-y-2">
-          <Button
-            onClick={fetchSuggestedMessages}
-            className="bg-[#BC6C25] hover:bg-[#9E5A20] text-white"
-            disabled={isSuggestLoading}
-          >
-            {isSuggestLoading ? 'Loading...' : 'Suggest Messages'}
-          </Button>
-          <p>Click on any message below to select it.</p>
-        </div>
-        <Card className="mb-2 bg-[#B3C186]">
-          <CardHeader>
-            <h3 className="text-xl font-semibold">Suggested Questions</h3>
-          </CardHeader>
-          <CardContent className="flex flex-col space-y-4">
-            {suggestions.length > 0 ? (
-              suggestions.map((message, index) => (
-                <Button
-                  key={index}
-                  variant="outline"
-                  className="mb-2 bg-[#EEF1E4] border border-[#d1e7dd] focus:ring-[#a3d9a5]"
-                  onClick={() => handleMessageClick(message)}
-                >
-                  {message}
-                </Button>
-              ))
-            ) : (
-              <p className="text-gray-500">
-                No suggestions yet. Click the button above to generate some!
-              </p>
-            )}
-          </CardContent>
-        </Card>
+      <div className="mx-auto max-w-6xl px-4 py-8 md:px-6 md:py-10">
+        {!recipient ? (
+          <div className="mx-auto max-w-lg rounded-xl border border-dashed border-sage bg-white px-6 py-14 text-center">
+            <Link2Off className="mx-auto h-7 w-7 text-stone-400" aria-hidden="true" />
+            <h1 className="mt-4 font-display text-2xl font-bold text-stone-900">
+              Nobody is at this link
+            </h1>
+            <p className="mx-auto mt-2 max-w-sm text-sm text-stone-600">
+              There is no inbox for <span className="font-mono">@{username}</span>. The link may be
+              mistyped, or the account was never verified.
+            </p>
+            <Button asChild className="mt-6 bg-clay text-white hover:bg-clay-dark">
+              <Link href="/sign-up">Create this inbox</Link>
+            </Button>
+          </div>
+        ) : !recipient.isAcceptingMessages ? (
+          <div className="mx-auto max-w-lg rounded-xl border border-leaf bg-white px-6 py-14 text-center shadow-sm">
+            <PauseCircle className="mx-auto h-7 w-7 text-olive" aria-hidden="true" />
+            <h1 className="mt-4 font-display text-2xl font-bold text-stone-900">
+              @{recipient.username} has paused their inbox
+            </h1>
+            <p className="mx-auto mt-2 max-w-sm text-sm text-stone-600">
+              They are not taking new notes right now. Try again later — the link stays the same.
+            </p>
+            <Button
+              asChild
+              variant="outline"
+              className="mt-6 border-leaf bg-white text-stone-700 hover:bg-stone-100 hover:text-stone-900"
+            >
+              <Link href="/">What is Anonify?</Link>
+            </Button>
+          </div>
+        ) : (
+          <ComposeNote username={recipient.username} />
+        )}
       </div>
-      <Separator className="my-6" />
-      <div className="text-center">
-        <div className="mb-4">Get Your Message Board</div>
-        <Link href={'/sign-up'}>
-          <Button className="bg-[#BC6C25] hover:bg-[#9E5A20] text-white">Create Your Account</Button>
-        </Link>
-      </div>
-    </div>
+    </main>
   );
 }

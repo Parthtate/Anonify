@@ -1,13 +1,12 @@
-import Navbar from '@/components/Navbar';
+import { SiteHeader } from '@/components/site-header';
+import { SignOutButton } from '@/components/sign-out-button';
 
-interface RootLayoutProps {
-  children: React.ReactNode;
-}
-
-export default async function RootLayout({ children }: RootLayoutProps) {
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col min-h-screen">
-      <Navbar />
+    <div className="flex min-h-screen flex-col bg-stone-50">
+      <SiteHeader homeHref="/dashboard">
+        <SignOutButton />
+      </SiteHeader>
       {children}
     </div>
   );

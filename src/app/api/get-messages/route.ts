@@ -5,6 +5,12 @@ import { User } from 'next-auth';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../auth/[...nextauth]/options';
 
+// Never prerendered: this handler needs a live database and the caller's session.
+export const dynamic = 'force-dynamic';
+
+const DEFAULT_LIMIT = 12;
+const MAX_LIMIT = 50;
+
 export async function GET(request: Request) {
   await dbConnect();
   const session = await getServerSession(authOptions);
@@ -16,16 +22,56 @@ export async function GET(request: Request) {
       { status: 401 }
     );
   }
-  const userId = new mongoose.Types.ObjectId(_user._id);
-  try {
-    const user = await UserModel.aggregate([
-      { $match: { _id: userId } },
-      { $unwind: '$messages' },
-      { $sort: { 'messages.createdAt': -1 } },
-      { $group: { _id: '$_id', messages: { $push: '$messages' } } },
-    ]).exec();
 
-    if (!user || user.length === 0) {
+  const { searchParams } = new URL(request.url);
+  const parsedLimit = Number.parseInt(searchParams.get('limit') ?? '', 10);
+  const limit =
+    Number.isInteger(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, MAX_LIMIT) : DEFAULT_LIMIT;
+
+  // Cursor: only notes strictly older than this timestamp are returned.
+  const beforeParam = searchParams.get('before');
+  const before = beforeParam ? new Date(beforeParam) : null;
+  if (before && Number.isNaN(before.getTime())) {
+    return Response.json(
+      { success: false, message: 'Invalid cursor' },
+      { status: 400 }
+    );
+  }
+
+  try {
+    // Filter, sort and slice inside the database so only one batch leaves the server.
+    const [result] = await UserModel.aggregate<{
+      total: number;
+      remaining: number;
+      messages: unknown[];
+    }>([
+      { $match: { _id: new mongoose.Types.ObjectId(_user._id) } },
+      {
+        $project: {
+          total: { $size: '$messages' },
+          older: before
+            ? {
+                $filter: {
+                  input: '$messages',
+                  as: 'm',
+                  cond: { $lt: ['$$m.createdAt', before] },
+                },
+              }
+            : '$messages',
+        },
+      },
+      {
+        $project: {
+          total: 1,
+          remaining: { $size: '$older' },
+          messages: {
+            $slice: [{ $sortArray: { input: '$older', sortBy: { createdAt: -1 } } }, limit],
+          },
+        },
+      },
+    ]);
+
+    if (!result) {
       return Response.json(
         { message: 'User not found', success: false },
         { status: 404 }
@@ -33,10 +79,8 @@ export async function GET(request: Request) {
     }
 
     return Response.json(
-      { messages: user[0].messages },
-      {
-        status: 200,
-      }
+      { messages: result.messages, total: result.total, hasMore: result.remaining > limit },
+      { status: 200 }
     );
   } catch (error) {
     console.error('An unexpected error occurred:', error);

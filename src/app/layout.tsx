@@ -7,8 +7,19 @@ import { Toaster } from '@/components/ui/toaster';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'ANONIFY',
-  description: 'Real texts from Real ones.',
+  title: {
+    default: 'Anonify — anonymous messages, filtered on arrival',
+    template: '%s · Anonify',
+  },
+  description:
+    'Share one link and let anyone write to you anonymously. A trained filter blocks abusive notes before they reach your inbox.',
+  openGraph: {
+    title: 'Anonify — anonymous messages, filtered on arrival',
+    description:
+      'Share one link and let anyone write to you anonymously. Abusive notes are blocked before delivery.',
+    siteName: 'Anonify',
+    type: 'website',
+  },
 };
 
 interface RootLayoutProps {

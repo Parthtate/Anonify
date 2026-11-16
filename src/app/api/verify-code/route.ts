@@ -1,5 +1,9 @@
 import dbConnect from '@/lib/dbConnect';
 import UserModel from '@/model/User';
+import { rateLimit, tooManyRequests } from '@/lib/rateLimit';
+
+// A 6-digit code is brute-forceable without a cap on attempts.
+const PER_USERNAME = { limit: 10, windowMs: 60 * 60 * 1000 };
 
 export async function POST(request: Request) {
   // Connect to the database
@@ -8,6 +12,18 @@ export async function POST(request: Request) {
   try {
     const { username, code } = await request.json();
     const decodedUsername = decodeURIComponent(username);
+
+    const attempts = await rateLimit(
+      `verify:${decodedUsername}`,
+      PER_USERNAME.limit,
+      PER_USERNAME.windowMs
+    );
+    if (!attempts.ok) {
+      return tooManyRequests(
+        'Too many verification attempts. Please wait an hour and try again.',
+        attempts.retryAfterSeconds
+      );
+    }
     const user = await UserModel.findOne({ username: decodedUsername });
 
     if (!user) {
