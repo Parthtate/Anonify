@@ -26,6 +26,10 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return {
     title,
     description,
+    // Inbox links are shared with friends, not published. Indexing them would let
+    // anyone enumerate every account with a site: query, and would bury the real
+    // pages under thousands of near-identical ones.
+    robots: { index: false, follow: false },
     openGraph: { title: `${title} · Anonify`, description, type: 'website' },
   };
 }

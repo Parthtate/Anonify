@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/options';
@@ -90,6 +91,27 @@ const FAQS = [
   },
 ];
 
+// Resolved against metadataBase, so it follows the deployed origin rather than
+// pinning a host here. Stops the www redirect and the vercel.app alias from being
+// read as three sites with the same content.
+export const metadata: Metadata = { alternates: { canonical: '/' } };
+
+// Tells Google this is one product with a name, not a generic page, which is what
+// earns a branded result rather than a plain blue link.
+const STRUCTURED_DATA = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: 'Anonify',
+  url: process.env.NEXTAUTH_URL,
+  applicationCategory: 'SocialNetworkingApplication',
+  operatingSystem: 'Any',
+  description:
+    'Share one link and let anyone write to you anonymously. A trained filter blocks abusive notes before they reach your inbox.',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'INR' },
+  isAccessibleForFree: true,
+  sameAs: [REPO],
+};
+
 export default async function Home() {
   // Reads the session so the page greets a signed-in visitor instead of selling to them.
   const session = await getServerSession(authOptions);
@@ -97,6 +119,10 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen bg-stone-50">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }}
+      />
       <SiteHeader>
         <Button asChild variant="ghost" size="sm" className={headerGhostClass}>
           <a href={REPO} target="_blank" rel="noopener noreferrer">
