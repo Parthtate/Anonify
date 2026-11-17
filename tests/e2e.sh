@@ -6,9 +6,14 @@
 #
 # Talks to the database named in .env and cleans up after itself. Never point it at a
 # database with real users: it deletes accounts matching /^(e2e_|tmp_|anonify_demo)/,
-# plus any account holding BREVO_SENDER_EMAIL (the suite signs up with that address,
-# and a leftover verified account on it would block sign-up), and clears the
-# rate-limit buckets so the suite is repeatable.
+# plus any account holding E2E_EMAIL (the suite signs up with that address, and a
+# leftover verified account on it would block sign-up), and clears the rate-limit
+# buckets so the suite is repeatable.
+#
+# E2E_EMAIL must be a real inbox you control. It falls back to BREVO_SENDER_EMAIL,
+# which only works while the sender is a mailbox: once the sender is a no-reply
+# address on an authenticated domain, signing up as it bounces every run and costs
+# that domain sending reputation.
 set -u
 cd "$(dirname "$0")/.." || exit 1
 
@@ -16,7 +21,8 @@ B=${BASE_URL:-http://localhost:3000}
 U="e2e_$(date +%H%M%S)"
 P="Test@12345"
 NEWP="Fresh@98765"
-EMAIL=$(awk -F= '/^BREVO_SENDER_EMAIL=/{print $2}' .env | tr -d '\r ')
+EMAIL=$(awk -F= '/^E2E_EMAIL=/{print $2}' .env | tr -d '[:space:]')
+EMAIL=${EMAIL:-$(awk -F= '/^BREVO_SENDER_EMAIL=/{print $2}' .env | tr -d '[:space:]')}
 JAR=$(mktemp)
 PASS=0
 FAIL=0
@@ -55,7 +61,7 @@ m.connect(env.MONGODB_URI,{serverSelectionTimeoutMS:10000}).then(async()=>{
 
 echo "server=$B  user=$U"
 echo "--- preflight: clear test accounts and rate-limit buckets ---"
-dbnode "const r=await col.deleteMany({\$or:[{username:/^(e2e_|tmp_|anonify_demo)/},{email:env.BREVO_SENDER_EMAIL}]});await rl.deleteMany({});console.log('  cleared '+r.deletedCount+' leftover test account(s)');"
+dbnode "const r=await col.deleteMany({\$or:[{username:/^(e2e_|tmp_|anonify_demo)/},{email:(env.E2E_EMAIL||env.BREVO_SENDER_EMAIL)}]});await rl.deleteMany({});console.log('  cleared '+r.deletedCount+' leftover test account(s)');"
 
 echo "--- sign-up and verification ---"
 req GET "/api/check-username-unique?username=$U";              check "username availability" 200 "unique"
@@ -164,7 +170,7 @@ fi
 
 echo
 echo "--- cleanup ---"
-dbnode "const r=await col.deleteMany({\$or:[{username:/^(e2e_|tmp_|anonify_demo)/},{email:env.BREVO_SENDER_EMAIL}]});await rl.deleteMany({});console.log('  removed '+r.deletedCount+' test account(s); users now '+await col.countDocuments());"
+dbnode "const r=await col.deleteMany({\$or:[{username:/^(e2e_|tmp_|anonify_demo)/},{email:(env.E2E_EMAIL||env.BREVO_SENDER_EMAIL)}]});await rl.deleteMany({});console.log('  removed '+r.deletedCount+' test account(s); users now '+await col.countDocuments());"
 echo
 echo "RESULT: $PASS passed, $FAIL failed"
 [ "$FAIL" = 0 ]

@@ -81,9 +81,14 @@ npm run dev              # http://localhost:3000
 | `NEXTAUTH_URL` | `http://localhost:3000` locally; the deployed URL in production |
 | `BREVO_API_KEY` | Brevo **API key** (starts `xkeysib-`, not the SMTP key) |
 | `BREVO_SENDER_EMAIL` | A sender address verified in Brevo |
+| `E2E_EMAIL` | Inbox the test suite signs up with. Optional; falls back to `BREVO_SENDER_EMAIL` |
 
 `NEXTAUTH_URL` must be the real origin in production — password-reset and verification
 links are built from it.
+
+Keep `E2E_EMAIL` pointed at a mailbox you can actually read. Once `BREVO_SENDER_EMAIL`
+is a no-reply address on an authenticated domain, the suite signing up as the sender
+would bounce on every run and cost that domain sending reputation.
 
 ### Scripts
 
