@@ -7,6 +7,9 @@ import { Toaster } from '@/components/ui/toaster';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
+  // Same origin the email links are built from, so canonical and og: URLs name the
+  // real host instead of the deploy-specific one Next infers from VERCEL_URL.
+  metadataBase: process.env.NEXTAUTH_URL ? new URL(process.env.NEXTAUTH_URL) : undefined,
   title: {
     default: 'Anonify — anonymous messages, filtered on arrival',
     template: '%s · Anonify',
